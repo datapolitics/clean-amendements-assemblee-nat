@@ -11,7 +11,7 @@ def list_files(dir):
                 r.append(os.path.join(root, name))
     return r
 
-files = list_files("amandements")
+files = list_files(AMENDEMENTS_FOLDER)
 
 # %%
 # for each file, import to json and add selected fields to df
@@ -28,6 +28,7 @@ csv_columns = ['id',
             'datePublication',
             'dateSort',
             'sort',
+            'cartoucheInformatif',
             'documentURI',
             'seanceDiscussionRef',
             'article99',
@@ -44,7 +45,7 @@ def parse(field):
     else:
         return field
 
-csv_file = "df_amandements.csv"
+csv_file = "amendements.csv"
 try:
     with open(csv_file, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
@@ -66,6 +67,7 @@ try:
                     'datePublication' : parse(data["amendement"]["cycleDeVie"]["datePublication"]),
                     'dateSort': parse(data["amendement"]["cycleDeVie"]["dateSort"]),
                     'sort': parse(data["amendement"]["cycleDeVie"]["sort"]),
+                    'cartoucheInformatif': parse(data["amendement"]["corps"]["cartoucheInformatif"]),
                     'documentURI': parse(data["amendement"]["representations"]["representation"]["contenu"]["documentURI"]),
                     'seanceDiscussionRef' : parse(data["amendement"]["seanceDiscussionRef"]),
                     'article99' : parse(data["amendement"]["article99"]),
