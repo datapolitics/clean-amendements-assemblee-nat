@@ -3,6 +3,8 @@
 
 AMENDEMENTS_FOLDER = "amendements" # dosssier dans lequel ont été extraits les amandements téléchargés au format JSON depuis https://data.assemblee-nationale.fr/travaux-parlementaires/amendements/tous-les-amendements
 import os
+
+from pandas.core import groupby
 def list_files(dir):
     r = []
     for root, dirs, files in os.walk(dir):
@@ -18,7 +20,9 @@ files = list_files(AMENDEMENTS_FOLDER)
 import json
 import csv
 csv_columns = ['id',
+            'numeroOrdreDepot',
             'chronotag',
+            'prefixeOrganeExamen',
             'examenRef',
             'texteLegislatifRef',
             'typeAuteur',
@@ -28,6 +32,8 @@ csv_columns = ['id',
             'datePublication',
             'dateSort',
             'sort',
+            'etat_code',
+            'etat_libelle',
             'cartoucheInformatif',
             'documentURI',
             'seanceDiscussionRef',
@@ -57,7 +63,9 @@ try:
 
                 new_row = {
                     'id' : data["amendement"]["uid"],
+                    'numeroOrdreDepot' : data["amendement"]["identification"]["numeroOrdreDepot"],
                     'chronotag' : parse(data["amendement"]["chronotag"]),
+                    'prefixeOrganeExamen' :  parse(data["amendement"]["identification"]["prefixeOrganeExamen"]),
                     'examenRef' : parse(data["amendement"]["examenRef"]),
                     'texteLegislatifRef' : parse(data["amendement"]["texteLegislatifRef"]),
                     'typeAuteur' : parse(data["amendement"]["signataires"]["auteur"]["typeAuteur"]),
@@ -67,6 +75,8 @@ try:
                     'datePublication' : parse(data["amendement"]["cycleDeVie"]["datePublication"]),
                     'dateSort': parse(data["amendement"]["cycleDeVie"]["dateSort"]),
                     'sort': parse(data["amendement"]["cycleDeVie"]["sort"]),
+                    'etat_code': parse(data["amendement"]["cycleDeVie"]["etatDesTraitements"]["etat"]["code"]) if '@xsi:nil' not in data["amendement"]["cycleDeVie"]["etatDesTraitements"]["etat"] else "none",
+                    'etat_libelle': parse(data["amendement"]["cycleDeVie"]["etatDesTraitements"]["etat"]["libelle"]) if '@xsi:nil' not in data["amendement"]["cycleDeVie"]["etatDesTraitements"]["etat"] else "none",
                     'cartoucheInformatif': parse(data["amendement"]["corps"]["cartoucheInformatif"]),
                     'documentURI': parse(data["amendement"]["representations"]["representation"]["contenu"]["documentURI"]),
                     'seanceDiscussionRef' : parse(data["amendement"]["seanceDiscussionRef"]),
@@ -84,4 +94,39 @@ except IOError:
     print("I/O error")
 
 # %%
-# END
+# ajouter infos sur les députés et les partis
+import pandas as pd
+df_deputes = pd.read_csv("deputes.csv",sep=";",dtype={"identifiant":str})
+df_deputes["identifiant"] = "PA" + df_deputes["identifiant"]
+
+couleurs_politiques = {
+    'Les Républicains': "Droite",
+    'La République en Marche': "Centre",
+    'Libertés et Territoires': "Centre",
+    'Agir ensemble': "Centre",
+    'La France insoumise' : "Gauche radicale",
+    'Mouvement Démocrate (MoDem) et Démocrates apparentés' : "Centre",
+    'Socialistes et apparentés': "Gauche",
+    'UDI et Indépendants': "Droite",
+    'Non inscrit': "None",
+    'Gauche démocrate et républicaine' : "Gauche" 
+}
+
+df_deputes["couleur"] = df_deputes.apply(
+    lambda row: couleurs_politiques[row["Groupe politique (complet)"]],
+    axis=1)
+
+from datetime import datetime
+def parse_date(date):
+    try: 
+        print(date)
+        return datetime.strptime(date, '%Y-%m-%d')
+    except:
+        return "none"
+
+dateparse = lambda x:parse_date(x)
+
+df_amendements = pd.read_csv("amendements.csv",parse_dates=["dateDepot"]) #,date_parser=dateparse)
+df_amendements = df_amendements.merge(df_deputes, left_on="acteurRef", right_on="identifiant", how="left")
+
+df_amendements.to_csv("amendements.csv")
