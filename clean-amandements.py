@@ -112,10 +112,6 @@ couleurs_politiques = {
     'Gauche démocrate et républicaine' : "Gauche" 
 }
 
-df_deputes["couleur"] = df_deputes.apply(
-    lambda row: couleurs_politiques[row["Groupe politique (complet)"]],
-    axis=1)
-
 from datetime import datetime
 def parse_date(date):
     try: 
@@ -129,4 +125,45 @@ dateparse = lambda x:parse_date(x)
 df_amendements = pd.read_csv("amendements.csv",parse_dates=["dateDepot"]) #,date_parser=dateparse)
 df_amendements = df_amendements.merge(df_deputes, left_on="acteurRef", right_on="identifiant", how="left")
 
+df_amendements["Groupe politique (complet)"].fillna("Groupe Inconnu", inplace=True)
+
+
+#%%
+# on rajoute la data sur les groupes pour les députés n'appartenant plus à l'assemblée
+
+import csv
+
+with open('ex-deputes.csv', mode='r') as inp:
+    reader = csv.reader(inp)
+    map_deputes_mandat_ecourté = {rows[0]:rows[1] for rows in reader}
+
+
+deputes_not_found = []
+
+def map_groupe(row):
+
+    if(row["typeAuteur"] == "Député" and row["acteurRef"] in map_deputes_mandat_ecourté):
+            return map_deputes_mandat_ecourté[row["acteurRef"]]
+    else:
+            if(row["acteurRef"] != "none"):
+                deputes_not_found.append(row["acteurRef"])
+            return "Groupe Inconnu"
+            
+if(len(deputes_not_found)) > 0:
+    print("Les députés : " , deputes_not_found , " ont émis un amendement mais ne sont pas connus du sytème. Rafraichissez le csv de députés ou compléter la map de députés au mandat écourté")
+
+
+df_amendements["Groupe politique (complet)"] = df_amendements.apply(
+    lambda row: map_groupe(row) if row["Groupe politique (complet)"] == "Groupe Inconnu" else row["Groupe politique (complet)"],
+    axis=1
+)
+
+df_amendements["couleur"] = df_amendements.apply(
+    lambda row: couleurs_politiques[row["Groupe politique (complet)"]] if row["typeAuteur"] == "Député" else "none",
+    axis=1)
+
+
+#%%
 df_amendements.to_csv("amendements.csv")
+
+
